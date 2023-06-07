@@ -19,7 +19,7 @@ class StrictDataObject extends DataObject
 	/** @inheritDoc */
 	public function __get(string $name)
 	{
-		if (!isset($this->properties[$name]))
+		if (!array_key_exists($name, $this->properties))
 		{
 			throw new \OutOfRangeException(sprintf('Property “%s” does not exist', $name));
 		}
@@ -30,7 +30,7 @@ class StrictDataObject extends DataObject
 	/** @inheritDoc */
 	public function __set(string $name, mixed $value): void
 	{
-		if (!isset($this->properties[$name]))
+		if (!array_key_exists($name, $this->properties))
 		{
 			throw new \OutOfRangeException(sprintf('Property “%s” does not exist', $name));
 		}
