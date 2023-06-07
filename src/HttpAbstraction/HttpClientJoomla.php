@@ -9,7 +9,7 @@ namespace Akeeba\BackupJsonApi\HttpAbstraction;
 
 use Joomla\Http\HttpFactory;
 use Joomla\Http\Exception\InvalidResponseCodeException;
-
+use Joomla\Http\Http;
 /**
  * An HTTP client using Joomla Framework
  *
@@ -17,6 +17,7 @@ use Joomla\Http\Exception\InvalidResponseCodeException;
  */
 class HttpClientJoomla extends AbstractHttpClient
 {
+	private ?Http $http;
 
 	/**
 	 * @inheritDoc
