@@ -66,7 +66,7 @@ class Uri extends StrictDataObject
 		$uri .= in_array('host', $parts, true) ? $this->host : '';
 		$uri .= in_array('port', $parts, true) ? (!empty($this->port) ? ':' : '') . $this->port : '';
 		$uri .= in_array('path', $parts, true) ? $this->path : '';
-		$uri .= in_array('query', $parts, true) ? (!empty($query) ? '?' . $query : '') : '';
+		$uri .= in_array('query', $parts, true) ? ($this->query ? '?' . $this->query : '') : '';
 		$uri .= in_array('fragment', $parts, true) ? (!empty($this->fragment) ? '#' . $this->fragment : '') : '';
 
 		return $uri;
@@ -89,13 +89,15 @@ class Uri extends StrictDataObject
 
 	public function getVar(string $name, mixed $default = null)
 	{
-		return $this->vars[$name] ?? $default;
+		return array_key_exists($name, $this->vars) ? $this->vars[$name] : $default;
 	}
 
 	public function setVar(string $name, mixed $value): void
 	{
-		$this->vars[$name] = $value;
-		$this->query       = null;
+		$vars        = $this->vars;
+		$vars[$name] = $value;
+		$this->vars  = $vars;
+		$this->query = null;
 	}
 
 	public function delVar(string $name): void
@@ -105,7 +107,11 @@ class Uri extends StrictDataObject
 			return;
 		}
 
-		unset($this->vars[$name]);
+		$vars = $this->vars;
+
+		unset($vars[$name]);
+
+		$this->vars = $vars;
 
 		$this->query = null;
 	}
@@ -201,12 +207,7 @@ class Uri extends StrictDataObject
 			$parts['query'] = str_replace('&amp;', '&', $parts['query']);
 		}
 
-		foreach ($parts as $k => $v)
-		{
-			$this->$k = $v;
-		}
-
-		parse_str($parts['query'] ?? '', $this->vars);
+		parse_str($parts['query'] ?? '', $parts['vars']);
 
 		return $parts;
 	}
