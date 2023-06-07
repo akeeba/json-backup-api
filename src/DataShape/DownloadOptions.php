@@ -32,7 +32,7 @@ class DownloadOptions extends ImmutableDataObject
 	/** @inheritDoc */
 	public function __construct($properties = [])
 	{
-		parent::__construct(array_merge([
+		$properties = array_merge([
 			'mode'      => 'http',
 			'path'      => getcwd(),
 			'id'        => 0,
@@ -41,48 +41,47 @@ class DownloadOptions extends ImmutableDataObject
 			'part'      => -1,
 			'chunkSize' => 0,
 			'url'       => '',
-		], $properties));
+		], $properties);
 
-		if ($this->part >= 0)
-		{
-			$this->part++;
-		}
+		$properties['part'] = ($properties['part'] < 0) ? $properties['part'] : $properties['part'];
 
-		if (!in_array($this->mode, ['http', 'curl', 'chunk']))
+		if (!in_array($properties['mode'], ['http', 'curl', 'chunk']))
 		{
 			throw new NoDownloadMode();
 		}
 
-		$this->path = rtrim($this->path, '/');
+		$properties['path'] = rtrim($properties['path'], '/');
 
-		if (empty($this->path) || !is_dir($this->path))
+		if (empty($properties['path']) || !is_dir($properties['path']))
 		{
 			throw new NoDownloadPath();
 		}
 
-		switch ($this->mode)
+		switch ($properties['mode'])
 		{
 			case 'http':
 				break;
 
 			case 'chunk':
-				if ($this->chunkSize <= 1)
+				if ($properties['chunkSize'] <= 1)
 				{
-					$this->chunkSize = 10;
+					$properties['chunkSize'] = 10;
 				}
 				break;
 
 			case 'curl':
-				$this->url = rtrim($this->url, '/');
+				$properties['url'] = rtrim($properties['url'], '/');
 
-				if (empty($this->url))
+				if (empty($properties['url']))
 				{
 					throw new NoDownloadURL();
 				}
 
-				[$this->url, $this->authentication] = $this->processAuthenticatedUrl($this->url);
+				[$properties['url'], $properties['authentication']] = $this->processAuthenticatedUrl($properties['url']);
 				break;
 		}
+
+		parent::__construct($properties);
 	}
 
 	/**
