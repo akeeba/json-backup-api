@@ -58,11 +58,11 @@ abstract class AbstractHttpClient implements HttpClientInterface
 		{
 			default:
 			case 'json':
-				$apiResult = $this->exposeDataAPIv1($encapsulatedResponse);
+				$apiResult = $this->exposeDataAPIv1($encapsulatedResponse ?? '');
 				break;
 
 			case 'api':
-				$apiResult = $this->exposeDataAPIv2($encapsulatedResponse);
+				$apiResult = $this->exposeDataAPIv2($encapsulatedResponse ?? '');
 				break;
 		}
 
