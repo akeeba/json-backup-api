@@ -126,7 +126,10 @@ class Download
 			}
 			finally
 			{
-				fclose($fp);
+				if (is_resource($fp))
+				{
+					@fclose($fp);
+				}
 			}
 
 			// Check file size
@@ -245,7 +248,10 @@ class Download
 				}
 			}
 
-			@fclose($fp);
+			if (is_resource($fp))
+			{
+				@fclose($fp);
+			}
 
 			// Check file size
 			clearstatcache();
@@ -346,7 +352,10 @@ class Download
 
 			$status = curl_exec($ch);
 
-			@fclose($fp);
+			if (is_resource($fp))
+			{
+				@fclose($fp);
+			}
 
 			$errno      = curl_errno($ch);
 			$errmessage = curl_error($ch);
