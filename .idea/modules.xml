@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/json-backup-api.iml" filepath="$PROJECT_DIR$/.idea/json-backup-api.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/Akeeba Backup JSON API Client Library.iml" filepath="$PROJECT_DIR$/.idea/Akeeba Backup JSON API Client Library.iml" />
     </modules>
   </component>
 </project>
