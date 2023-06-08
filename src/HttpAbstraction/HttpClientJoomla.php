@@ -7,9 +7,10 @@
 
 namespace Akeeba\BackupJsonApi\HttpAbstraction;
 
-use Joomla\Http\HttpFactory;
 use Joomla\Http\Exception\InvalidResponseCodeException;
 use Joomla\Http\Http;
+use Joomla\Http\HttpFactory;
+
 /**
  * An HTTP client using Joomla Framework
  *
@@ -34,18 +35,23 @@ class HttpClientJoomla extends AbstractHttpClient
 			$fp = fopen($fp, 'w+');
 		}
 
-		$http = clone $this->http;
-		$http->setOption('transport.curl', [
-			CURLOPT_AUTOREFERER    => 1,
-			CURLOPT_FOLLOWLOCATION => 1,
-			CURLOPT_FAILONERROR    => true,
-			CURLOPT_HEADER         => false,
-			CURLOPT_FILE           => $fp,
-		]);
+		$http = (new HttpFactory())->getHttp(
+			[
+				'curl.certpath'   => $this->options->capath,
+				'userAgent'       => $this->options->ua,
+				'follow_location' => true,
+				'transport.curl'  => [
+					CURLOPT_AUTOREFERER    => 1,
+					CURLOPT_FAILONERROR    => true,
+					CURLOPT_RETURNTRANSFER => false,
+					CURLOPT_HEADER         => false,
+					CURLOPT_FILE           => $fp,
+				],
+			],
+			['curl']
+		);
 
-		$headers = [
-			'User-Agent' => $this->options->ua
-		];
+		$headers = [];
 
 		if (!empty($from) || !empty($to))
 		{
@@ -64,7 +70,7 @@ class HttpClientJoomla extends AbstractHttpClient
 				throw $e;
 			}
 		}
-		catch(InvalidResponseCodeException)
+		catch (InvalidResponseCodeException)
 		{
 			// No worries, this is expected.
 		}
@@ -98,7 +104,8 @@ class HttpClientJoomla extends AbstractHttpClient
 		$this->http = (new HttpFactory())->getHttp(
 			[
 				'curl.certpath'   => $this->options->capath,
-				'follow_location' => 1,
+				'userAgent'       => $this->options->ua,
+				'follow_location' => true,
 			],
 			['curl']
 		);
