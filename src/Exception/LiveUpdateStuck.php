@@ -1,7 +1,7 @@
 <?php
 /**
  * @package    AkeebaJsonBackupAPI
- * @copyright  Copyright (c)2008-2023 Nicholas K. Dionysopoulos / Akeeba Ltd
+ * @copyright  Copyright (c)2008-2024 Nicholas K. Dionysopoulos / Akeeba Ltd
  * @license    AGPL-3.0-or-later
  */
 
