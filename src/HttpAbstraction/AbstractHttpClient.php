@@ -264,8 +264,22 @@ abstract class AbstractHttpClient implements HttpClientInterface
 			'data'   => $data,
 		];
 
+		$md5func = function ($string)
+		{
+			static $shouldUseHash = null;
+
+			if ($shouldUseHash === null)
+			{
+				$shouldUseHash = function_exists('hash')
+				                 && function_exists('hash_algos')
+				                 && in_array('md5', hash_algos());
+			}
+
+			return $shouldUseHash ? hash('md5', $string) : md5($string);
+		};
+
 		$salt              = $this->randomString();
-		$challenge         = $salt . ':' . md5($salt . $this->options->secret);
+		$challenge         = $salt . ':' . $md5func($salt . $this->options->secret);
 		$body['challenge'] = $challenge;
 
 		$bodyData = json_encode($body);
