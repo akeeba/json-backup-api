@@ -41,7 +41,7 @@ class Delete
 
 		if ($data->body->status != 200)
 		{
-			throw new CannotDeleteFiles($id, $data->body->status, $data->body->data);
+			throw new CannotDeleteFiles($id);
 		}
 	}
 }
