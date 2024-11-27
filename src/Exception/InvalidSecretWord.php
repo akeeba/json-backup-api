@@ -16,7 +16,7 @@ use Exception;
  */
 class InvalidSecretWord extends ApiException
 {
-	public function __construct(int $code = 42, Exception $previous = null)
+	public function __construct(int $code = 42, ?Exception $previous = null)
 	{
 		$message = 'Authentication error (invalid Secret Word). Please check the secret word, make sure it doesn\'t have any whitespace you missed. Clear any site or external caches, making sure Akeeba Backup\'s URL isn\'t cached.';
 

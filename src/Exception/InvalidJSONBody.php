@@ -20,7 +20,7 @@ use Exception;
  */
 class InvalidJSONBody extends ApiException
 {
-	public function __construct(int $code = 21, Exception $previous = null)
+	public function __construct(int $code = 21, ?Exception $previous = null)
 	{
 		$message = 'Invalid response body. Something between the web server and this client is corrupting the response.';
 

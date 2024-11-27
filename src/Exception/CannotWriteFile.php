@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class CannotWriteFile extends RuntimeException
 {
-	public function __construct(string $filePath, int $code = 104, Exception $previous = null)
+	public function __construct(string $filePath, int $code = 104, ?Exception $previous = null)
 	{
 		$message = sprintf('Cannot open file ‘%s’ for writing.', $filePath);
 

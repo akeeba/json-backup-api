@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class NoSuchPart extends RuntimeException
 {
-	public function __construct(int $code = 43, Exception $previous = null)
+	public function __construct(int $code = 43, ?Exception $previous = null)
 	{
 		$message = 'The part number you specified does not exist in this backup record.';
 

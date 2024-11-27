@@ -17,7 +17,7 @@ use Throwable;
  */
 class LiveUpdateCleanupError extends RuntimeException
 {
-	public function __construct(string $errorMessage, int $code = 118, Throwable $previous = null)
+	public function __construct(string $errorMessage, int $code = 118, ?Throwable $previous = null)
 	{
 		$message = sprintf('Update failed to clean up with error ‘%s’', $errorMessage);
 

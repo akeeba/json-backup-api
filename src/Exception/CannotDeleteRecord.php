@@ -17,7 +17,7 @@ use Throwable;
  */
 class CannotDeleteRecord extends RuntimeException
 {
-	public function __construct(int $id, int $code = 107, Throwable $previous = null)
+	public function __construct(int $id, int $code = 107, ?Throwable $previous = null)
 	{
 		$message = sprintf("Cannot delete backup record %d.", $id);
 

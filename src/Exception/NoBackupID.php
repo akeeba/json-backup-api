@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class NoBackupID extends RuntimeException
 {
-	public function __construct(int $code = 31, Exception $previous = null)
+	public function __construct(int $code = 31, ?Exception $previous = null)
 	{
 		$message = 'You must specify a numeric backup ID';
 

@@ -20,7 +20,7 @@ use RuntimeException;
  */
 class CannotDownloadFile extends RuntimeException
 {
-	public function __construct(string $message, int $code = 105, Exception $previous = null)
+	public function __construct(string $message, int $code = 105, ?Exception $previous = null)
 	{
 		parent::__construct($message, $code, $previous);
 	}

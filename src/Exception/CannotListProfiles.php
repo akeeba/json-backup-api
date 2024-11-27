@@ -17,7 +17,7 @@ use Throwable;
  */
 class CannotListProfiles extends RuntimeException
 {
-	public function __construct(int $code = 109, Throwable $previous = null)
+	public function __construct(int $code = 109, ?Throwable $previous = null)
 	{
 		$message = 'Cannot list backup records.';
 

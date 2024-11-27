@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class NoConfiguredSecret extends RuntimeException
 {
-	public function __construct(int $code = 37, Exception $previous = null)
+	public function __construct(int $code = 37, ?Exception $previous = null)
 	{
 		$message = 'You did not specify a secret key.';
 

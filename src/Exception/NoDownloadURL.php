@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class NoDownloadURL extends RuntimeException
 {
-	public function __construct(int $code = 34, Exception $previous = null)
+	public function __construct(int $code = 34, ?Exception $previous = null)
 	{
 		$message = 'You must provide a download URL for use with cURL';
 

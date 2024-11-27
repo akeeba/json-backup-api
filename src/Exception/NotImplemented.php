@@ -16,7 +16,7 @@ use Exception;
  */
 class NotImplemented extends ApiException
 {
-	public function __construct(string $method = '', int $code = 44, Exception $previous = null)
+	public function __construct(string $method = '', int $code = 44, ?Exception $previous = null)
 	{
 		$message = sprintf('The method %s is no longer implemented by the Akeeba Remote JSON API on your server.', $method);
 

@@ -17,7 +17,7 @@ use Throwable;
  */
 class CannotListBackupRecords extends RuntimeException
 {
-	public function __construct(int $code = 108, Throwable $previous = null)
+	public function __construct(int $code = 108, ?Throwable $previous = null)
 	{
 		$message = 'Could not list backup records';
 

@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class CommunicationError extends RuntimeException
 {
-	public function __construct(int $errCode, string $errMessage, int $code = 22, Exception $previous = null)
+	public function __construct(int $errCode, string $errMessage, int $code = 22, ?Exception $previous = null)
 	{
 		$message = sprintf('Network error %d with message “%s”. Please check the host name and the status of your network connectivity.', $errCode, $errMessage);
 

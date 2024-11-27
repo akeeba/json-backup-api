@@ -17,7 +17,7 @@ use Throwable;
  */
 class CannotGetUpdateInformation extends RuntimeException
 {
-	public function __construct(int $code = 111, Throwable $previous = null)
+	public function __construct(int $code = 111, ?Throwable $previous = null)
 	{
 		$message = 'Cannot retrieve update information.';
 

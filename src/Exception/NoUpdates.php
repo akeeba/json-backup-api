@@ -17,7 +17,7 @@ use Throwable;
  */
 class NoUpdates extends RuntimeException
 {
-	public function __construct(int $code = 1, Throwable $previous = null)
+	public function __construct(int $code = 1, ?Throwable $previous = null)
 	{
 		$message = 'There are no available updates to your Akeeba Backup / Akeeba Solo installation.';
 

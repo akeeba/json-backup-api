@@ -16,7 +16,7 @@ use Exception;
  */
 class NoWayToConnect extends ApiException
 {
-	public function __construct(int $code = 36, Exception $previous = null)
+	public function __construct(int $code = 36, ?Exception $previous = null)
 	{
 		$message = 'We cannot find a way to connect to your server. It seems that your server is incompatible with Akeeba Remote Control CLI.';
 

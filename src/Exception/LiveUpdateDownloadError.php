@@ -17,7 +17,7 @@ use Throwable;
  */
 class LiveUpdateDownloadError extends RuntimeException
 {
-	public function __construct(string $errorMessage, int $code = 115, Throwable $previous = null)
+	public function __construct(string $errorMessage, int $code = 115, ?Throwable $previous = null)
 	{
 		$message = sprintf('Update download failed with error ‘%s’', $errorMessage);
 

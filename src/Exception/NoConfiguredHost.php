@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class NoConfiguredHost extends RuntimeException
 {
-	public function __construct(int $code = 35, Exception $previous = null)
+	public function __construct(int $code = 35, ?Exception $previous = null)
 	{
 		$message = 'You did not specify a host name.';
 

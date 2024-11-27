@@ -18,7 +18,7 @@ use Throwable;
  */
 class LiveUpdateStability extends RuntimeException
 {
-	public function __construct(int $code = 114, Throwable $previous = null)
+	public function __construct(int $code = 114, ?Throwable $previous = null)
 	{
 		$message = 'The available update is less stable than the minimum stability you have chosen for updates. As a result the update will not proceed.';
 

@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class NoDownloadMode extends RuntimeException
 {
-	public function __construct(int $code = 32, Exception $previous = null)
+	public function __construct(int $code = 32, ?Exception $previous = null)
 	{
 		$message = 'You must specify a download mode (http, curl or chunk).';
 

@@ -17,7 +17,7 @@ use Throwable;
  */
 class NoSuchBackupRecord extends RuntimeException
 {
-	public function __construct(int $code = 110, Throwable $previous = null)
+	public function __construct(int $code = 110, ?Throwable $previous = null)
 	{
 		$message = 'The specified backup record does not exist';
 

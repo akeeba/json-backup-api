@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class NoDownloadPath extends RuntimeException
 {
-	public function __construct(int $code = 33, Exception $previous = null)
+	public function __construct(int $code = 33, ?Exception $previous = null)
 	{
 		$message = 'You must specify a path to download the files to.';
 

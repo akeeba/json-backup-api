@@ -17,7 +17,7 @@ use RuntimeException;
  */
 class NoProfileData extends RuntimeException
 {
-	public function __construct(int $code = 40, Exception $previous = null)
+	public function __construct(int $code = 40, ?Exception $previous = null)
 	{
 		$message = 'You must supply the profile data that should be imported';
 

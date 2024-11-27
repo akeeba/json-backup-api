@@ -17,7 +17,7 @@ use Throwable;
  */
 class LiveUpdateInstallError extends RuntimeException
 {
-	public function __construct(string $errorMessage, int $code = 117, Throwable $previous = null)
+	public function __construct(string $errorMessage, int $code = 117, ?Throwable $previous = null)
 	{
 		$message = sprintf('Update package failed to install with error ‘%s’', $errorMessage);
 

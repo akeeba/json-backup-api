@@ -17,7 +17,7 @@ use Throwable;
  */
 class LiveUpdateExtractError extends RuntimeException
 {
-	public function __construct(string $errorMessage, int $code = 116, Throwable $previous = null)
+	public function __construct(string $errorMessage, int $code = 116, ?Throwable $previous = null)
 	{
 		$message = sprintf('Update package failed to extract with error ‘%s’', $errorMessage);
 
