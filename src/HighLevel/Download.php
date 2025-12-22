@@ -360,7 +360,10 @@ class Download
 			$errno      = curl_errno($ch);
 			$errmessage = curl_error($ch);
 
-			curl_close($ch);
+			if (version_compare(PHP_VERSION, '8.5.0', 'lt'))
+			{
+				curl_close($ch);
+			}
 
 			if ($errno !== 0)
 			{
