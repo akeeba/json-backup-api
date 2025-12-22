@@ -1,2 +1,3 @@
 ### Composer vendor folder
 /vendor/**
+/.idea/laravel-idea.xml
