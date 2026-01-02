@@ -64,7 +64,7 @@ $apiClient->backup($backupOptions, function ($data) {
 ## License
 
 Akeeba Backup JSON API Client Library — A PHP client library for talking to the Akeeba Backup and Akeeba Solo JSON API.
-Copyright (C) 2008-2025  Nicholas K. Dionysopoulos / Akeeba Ltd
+Copyright (C) 2008-2026  Nicholas K. Dionysopoulos / Akeeba Ltd
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
