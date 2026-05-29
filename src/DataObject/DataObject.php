@@ -95,7 +95,6 @@ class DataObject implements IteratorAggregate, JsonSerializable, Countable
 	 * @return  Iterator
 	 * @since   1.0.0
 	 */
-	#[\ReturnTypeWillChange]
 	public function getIterator(): Iterator
 	{
 		foreach ($this->properties as $k => $v)
@@ -110,7 +109,6 @@ class DataObject implements IteratorAggregate, JsonSerializable, Countable
 	 * @return  int
 	 * @since   1.0.0
 	 */
-	#[\ReturnTypeWillChange]
 	public function count(): int
 	{
 		return count($this->properties);
@@ -122,7 +120,6 @@ class DataObject implements IteratorAggregate, JsonSerializable, Countable
 	 * @return  string
 	 * @since   1.0.0
 	 */
-	#[\ReturnTypeWillChange]
 	public function jsonSerialize(): array
 	{
 		return $this->properties;
