@@ -339,10 +339,11 @@ class Download
 			curl_setopt($ch, CURLOPT_FAILONERROR, true);
 			curl_setopt($ch, CURLOPT_HEADER, false);
 			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+			curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
 			curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 60);
 			curl_setopt($ch, CURLOPT_FILE, $fp);
-			curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (X11; Linux x86_64; rv:2.0.1) Gecko/20110506 Firefox/4.0.1');
+			curl_setopt($ch, CURLOPT_USERAGENT, $this->httpClient->getOptions()->ua);
 			curl_setopt($ch, CURLOPT_CAINFO, $this->httpClient->getOptions()->capath);
 
 			if (!empty($authentication))
