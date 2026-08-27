@@ -79,8 +79,6 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-## Alternative licensing
+## Regulatory status (EU Cyber Resilience Act)
 
-If you would like to use this Software, but the GNU Affero General Public License (especially Article 13 of the license)
-is problematic for your use case please [contact us](https://www.akeeba.com/contact-us.html) to purchase an alternative,
-proprietary software license for the Software.
+Akeeba Backup JSON API Client Library is not monetized and is not placed on the market within the meaning of Regulation (EU) 2024/2847; Akeeba Ltd acts as its open-source software steward under Article 24 of that Regulation.
