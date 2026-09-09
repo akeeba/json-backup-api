@@ -1,0 +1,15 @@
+# The disposable Akeeba Backup JSON API server the integration suite talks to.
+#
+# The PHP version here is the *server's*, and it barely matters: what the suite is testing is the client library, and
+# this end only has to speak HTTP and JSON. The version that matters is the client's, in Dockerfile.client.
+ARG PHP_VERSION=8.4
+
+FROM php:${PHP_VERSION}-apache
+
+COPY config/fixture-vhost.conf /etc/apache2/sites-available/000-default.conf
+COPY config/fixture-php.ini /usr/local/etc/php/conf.d/zz-fixture.ini
+COPY fixture/ /var/www/html/
+
+# The fixture keeps its state in a file rather than a database. Nothing here outlives the container.
+RUN mkdir -p /var/www/state \
+    && chown -R www-data:www-data /var/www/state /var/www/html

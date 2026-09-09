@@ -1,3 +1,8 @@
 ### Composer vendor folder
 /vendor/**
 /.idea/laravel-idea.xml
+### Test suite
+/tests/config.php
+/tests/docker/.env
+/.phpunit.cache
+/.phpunit.result.cache

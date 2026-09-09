@@ -1,0 +1,96 @@
+# The disposable stack the integration suite runs against.
+#
+# Never composed or run by hand: run.sh is the supported entry point, and it is what makes sure a previous run cannot
+# leak into this one.
+
+name: ${E2E_PROJECT_NAME:-akeeba-jsonapi-e2e}
+
+services:
+  # The site under test. Every name below resolves to this container, which is what lets the redirect tests exercise
+  # the real host comparison rather than a string one.
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        PHP_VERSION: ${E2E_SERVER_PHP_VERSION:-8.4}
+    container_name: ${E2E_PROJECT_NAME:-akeeba-jsonapi-e2e}-web
+    environment:
+      FIXTURE_SECRET: ${E2E_SECRET:-TheAkeebaBackupSecretWord}
+      FIXTURE_TOKEN: ${E2E_TOKEN:-token}
+      FIXTURE_RESTRICTED_TOKEN: ${E2E_RESTRICTED_TOKEN:-restricted}
+    ports:
+      - "127.0.0.1:${E2E_HTTP_PORT:-18080}:80"
+    networks:
+      e2e:
+        aliases:
+          - www.example.test
+          - example.test
+          - foobar.example.test
+          - a.b.example.test
+          - api.example.test
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1/health.php') === 'OK' ? 0 : 1);"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Somewhere the library must never follow a redirect to.
+  #
+  # It runs the same fixture and records every request it receives, so "the redirect was refused" can be asserted as
+  # "nothing was ever delivered here" — which is the part that would fail if the guard were removed, and the part a
+  # log line cannot prove.
+  evil:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+      args:
+        PHP_VERSION: ${E2E_SERVER_PHP_VERSION:-8.4}
+    container_name: ${E2E_PROJECT_NAME:-akeeba-jsonapi-e2e}-evil
+    environment:
+      FIXTURE_SECRET: ${E2E_SECRET:-TheAkeebaBackupSecretWord}
+      FIXTURE_TOKEN: ${E2E_TOKEN:-token}
+      FIXTURE_RESTRICTED_TOKEN: ${E2E_RESTRICTED_TOKEN:-restricted}
+    ports:
+      - "127.0.0.1:${E2E_SINK_HTTP_PORT:-18081}:80"
+    networks:
+      e2e:
+        aliases:
+          - evil.test
+          # A sibling of an ancestor: related to api.example.test only through a public suffix list, which this
+          # library deliberately does without, so it has to fail closed.
+          - shop.example.test
+          # Names which merely look like the caller's domain.
+          - notexample.test
+          - www.example.test.evil.test
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1/health.php') === 'OK' ? 0 : 1);"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # The test runner. The project is mounted rather than copied so an edit to a test is picked up without a rebuild.
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+      args:
+        PHP_VERSION: ${E2E_PHP_VERSION:-8.5}
+    environment:
+      E2E_SECRET: ${E2E_SECRET:-TheAkeebaBackupSecretWord}
+      E2E_TOKEN: ${E2E_TOKEN:-token}
+      E2E_RESTRICTED_TOKEN: ${E2E_RESTRICTED_TOKEN:-restricted}
+    volumes:
+      - ../../:/app
+    working_dir: /app
+    networks:
+      - e2e
+    depends_on:
+      web:
+        condition: service_healthy
+      evil:
+        condition: service_healthy
+
+networks:
+  e2e:
+    name: ${E2E_PROJECT_NAME:-akeeba-jsonapi-e2e}-net

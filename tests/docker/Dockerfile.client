@@ -1,0 +1,10 @@
+# The container the test suite itself runs in.
+#
+# This is where the PHP version matters. The code under test is a client library, so "running under PHP 8.2" means the
+# *tests* run under PHP 8.2 — which is why the suite runs in a container rather than on the host. See README.md.
+ARG PHP_VERSION=8.5
+
+FROM php:${PHP_VERSION}-cli
+
+# ext-curl and ext-openssl ship with the official images; nothing else in this project needs compiling.
+WORKDIR /app
