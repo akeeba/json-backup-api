@@ -1,6 +1,6 @@
 # Akeeba Backup JSON API Client Library
 
-A PHP client library for talking to the Akeeba Backup and Akeeba Solo JSON API.
+The official PHP client library for talking to the Akeeba Backup and Akeeba Solo JSON API.
 
 This library works with:
 * Akeeba Backup for Joomla! 4.7.7 and later
@@ -163,6 +163,10 @@ GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+## Notice on the status of Akeeba Backup JSON API clients
+
+This is the only official client library for the Akeeba Backup JSON API. We do not support the use of any third-party client library or consumer with our backup software. If you have a problem with a third party tool which cannot be reproduced using this library, the default and only conclusion is that the third party is at fault, not our backup software.
 
 ## Regulatory status (EU Cyber Resilience Act)
 
