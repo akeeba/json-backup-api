@@ -21,6 +21,11 @@
 		"psr/http-message": ">=1.0",
 		"composer-runtime-api": "^2.0.0"
 	},
+	"require-dev": {
+		"phpunit/phpunit": "^11.5",
+		"guzzlehttp/guzzle": "^7.8",
+		"joomla/http": "^3.0"
+	},
 	"suggest": {
 		"ext-curl": "Allows the cURL method for archive downloads",
 		"guzzlehttp/guzzle": "The standard PHP HTTP client (see HttpClientGuzzle)",
@@ -36,6 +41,13 @@
 			"src/constants.php"
 		]
 	},
+	"autoload-dev": {
+		"psr-4": {
+			"Akeeba\\BackupJsonApi\\Tests\\": [
+				"tests"
+			]
+		}
+	},
 	"config": {
 		"optimize-autoloader": true,
 		"platform": {
@@ -44,8 +56,16 @@
 	},
 	"archive": {
 		"exclude": [
+			"/.claude",
 			"/.idea",
 			"/vendor",
+			"/tests",
+			"/phpunit.xml",
+			"/phpunit-integration.xml",
+			"/mempalace.yaml",
+			"/rector.php",
+			"/.phpunit.cache",
+			".phpunit.result.cache",
 			".gitignore"
 		]
 	}

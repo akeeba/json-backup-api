@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The integration suite. Separate from phpunit.xml on purpose: these tests need the disposable Docker stack, and
+    running them by accident as part of the unit suite would turn a missing Docker into a wall of failures.
+
+    Do not run this by hand. tests/docker/run.sh is what brings the stack up and runs it inside the container.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/bootstrap-e2e.php"
+         cacheDirectory=".phpunit.cache/integration"
+         colors="true"
+         failOnRisky="true"
+         failOnWarning="true"
+         beStrictAboutOutputDuringTests="true"
+         displayDetailsOnTestsThatTriggerErrors="true"
+         displayDetailsOnTestsThatTriggerNotices="true"
+         displayDetailsOnTestsThatTriggerWarnings="true">
+    <testsuites>
+        <testsuite name="integration">
+            <directory>tests/Integration/Tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
