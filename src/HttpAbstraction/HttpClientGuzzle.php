@@ -7,6 +7,7 @@
 
 namespace Akeeba\BackupJsonApi\HttpAbstraction;
 
+use Akeeba\BackupJsonApi\Exception\CommunicationError;
 use Akeeba\BackupJsonApi\Options;
 use Akeeba\BackupJsonApi\Uri\Uri;
 use GuzzleHttp\Client;
@@ -48,20 +49,75 @@ class HttpClientGuzzle extends AbstractHttpClient
 			$headers['Range'] = sprintf('bytes=%d=%d', $from, $to);
 		}
 
-		/**
-		 * getRequestOptions() adds the authentication headers to these. They are not optional here: the v3 API is
-		 * authenticated by header alone, so a downloadDirect URL carries no credential of its own.
-		 */
-		$options = $this->getRequestOptions($headers);
-
 		if (!is_resource($fp))
 		{
 			$fp = Psr7Utils::tryFopen($fp, 'w+');
 		}
 
-		$options[RequestOptions::SINK] = $fp;
+		/**
+		 * Wrap the file pointer once, and keep the wrapper for as long as we are downloading.
+		 *
+		 * Handed a bare resource, Guzzle wraps it in a PSR-7 stream of its own for each request, and that wrapper
+		 * closes the underlying resource when it is garbage collected — so the file pointer is dead by the time a
+		 * second request would need it. Handed a stream, Guzzle uses it as it is. Holding the only reference to it
+		 * here means it stays open across every hop of a redirect chain.
+		 */
+		$sink = Psr7Utils::streamFor($fp);
+		$hops = 0;
 
-		$this->getClient()->get($url, $options);
+		while (true)
+		{
+			/**
+			 * getRequestOptions() adds the authentication headers. They are not optional here: the v3 API is
+			 * authenticated by header alone, so a downloadDirect URL carries no credential of its own.
+			 */
+			$options = $this->getRequestOptions($headers);
+
+			/**
+			 * Follow redirects here rather than letting Guzzle's redirect middleware do it.
+			 *
+			 * A redirect response has a body of its own, and with a sink in play that body is written into the file
+			 * we are downloading to. Someone has to throw it away before the next hop, or it ends up prepended to
+			 * the archive — and the middleware gives us nowhere to do that. Doing the walking ourselves also means
+			 * the download path enforces the redirect policy exactly the way the other two clients do.
+			 */
+			$options[RequestOptions::ALLOW_REDIRECTS] = false;
+			$options[RequestOptions::SINK]            = $sink;
+
+			$response = $this->getClient()->get($url, $options);
+			$status   = $response->getStatusCode();
+
+			if (!$this->isRedirectStatus($status) || !$response->hasHeader('Location'))
+			{
+				return;
+			}
+
+			if (++$hops > $this->getMaxRedirects())
+			{
+				throw new CommunicationError(
+					$status,
+					sprintf('The server sent us through more than %d redirects', $this->getMaxRedirects())
+				);
+			}
+
+			$targetUrl = $this->resolveRedirectUrl($url, $response->getHeaderLine('Location'));
+
+			if ($targetUrl === null)
+			{
+				return;
+			}
+
+			$this->assertRedirectAllowed($url, $targetUrl);
+
+			/**
+			 * The redirect response had a body of its own, and it has already gone into our file. Throw it away, or
+			 * it would be prepended to the archive we are here for.
+			 */
+			ftruncate($fp, 0);
+			$sink->rewind();
+
+			$url = $targetUrl;
+		}
 	}
 
 	/**
@@ -98,9 +154,22 @@ class HttpClientGuzzle extends AbstractHttpClient
 	{
 		$options = [
 			RequestOptions::ALLOW_REDIRECTS => [
-				'max'     => 20,
-				'strict'  => true,
-				'referer' => true,
+				'max'       => $this->getMaxRedirects(),
+				'strict'    => true,
+				'referer'   => true,
+				'protocols' => ['http', 'https'],
+				/**
+				 * Vet every hop of a redirect chain before we walk it.
+				 *
+				 * Guzzle carries our request headers — including the v3 API's credential — across a redirect, and it
+				 * does not care whose host it is redirected to. It calls this hook after working out the next request
+				 * but before dispatching it, so throwing from here stops the credential from ever reaching a host we
+				 * do not trust.
+				 */
+				'on_redirect' => function ($request, $response, $uri): void
+				{
+					$this->assertRedirectAllowed((string) $request->getUri(), (string) $uri);
+				},
 			],
 			RequestOptions::CONNECT_TIMEOUT => $this->connectionTimeout,
 			RequestOptions::HEADERS         => array_merge($this->getRequestHeaders(), $headers),

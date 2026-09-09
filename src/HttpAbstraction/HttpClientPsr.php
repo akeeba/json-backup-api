@@ -12,6 +12,7 @@ use Akeeba\BackupJsonApi\Options;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
+use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 
 /**
@@ -70,7 +71,7 @@ class HttpClientPsr extends AbstractHttpClient
 			$request = $request->withHeader('Range', sprintf('bytes=%d=%d', $from, $to));
 		}
 
-		$response = $this->http->sendRequest($request);
+		$response = $this->sendFollowingRedirects($request);
 
 		if ($response->getStatusCode() < 200 || $response->getStatusCode() > 200)
 		{
@@ -86,7 +87,11 @@ class HttpClientPsr extends AbstractHttpClient
 		}
 		else
 		{
-			$fileStream = $this->streamFactory->createStreamFromFile($fp);
+			/**
+			 * The mode is not optional. PSR-17 defines createStreamFromFile() to default to 'r', so leaving it out
+			 * opens the download target read-only and the write below throws.
+			 */
+			$fileStream = $this->streamFactory->createStreamFromFile($fp, 'w+');
 		}
 
 		$fileStream->seek($from);
@@ -118,7 +123,7 @@ class HttpClientPsr extends AbstractHttpClient
 
 		$request = $this->applyHeaders($request);
 
-		$response = $this->http->sendRequest($request);
+		$response = $this->sendFollowingRedirects($request);
 
 		if ($response->getStatusCode() < 200 || $response->getStatusCode() > 200)
 		{
@@ -129,6 +134,110 @@ class HttpClientPsr extends AbstractHttpClient
 		}
 
 		return (string) $response->getBody();
+	}
+
+	/**
+	 * Sends a request, following any redirects which do not leave the caller's domain.
+	 *
+	 * A PSR-18 client is not obliged to follow redirects, and the common ones do not: Guzzle's PSR-18 entry point
+	 * explicitly disables its own redirect middleware. Since a Joomla! site will redirect an API URL for perfectly
+	 * ordinary reasons — a SEF language prefix, www to non-www, HTTP to HTTPS — we have to follow them ourselves, and
+	 * doing it ourselves is also what lets us apply the same domain check as the other clients.
+	 *
+	 * @param   RequestInterface  $request  The request to send
+	 *
+	 * @return  ResponseInterface  The first non-redirect response
+	 * @since   1.1.0
+	 */
+	private function sendFollowingRedirects(RequestInterface $request): ResponseInterface
+	{
+		$hops = 0;
+
+		while (true)
+		{
+			$response = $this->http->sendRequest($request);
+			$status   = $response->getStatusCode();
+
+			if (!$this->isRedirectStatus($status) || !$response->hasHeader('Location'))
+			{
+				return $response;
+			}
+
+			if (++$hops > $this->getMaxRedirects())
+			{
+				throw new CommunicationError(
+					$status,
+					sprintf('The server sent us through more than %d redirects', $this->getMaxRedirects())
+				);
+			}
+
+			$currentUrl = (string) $request->getUri();
+			$targetUrl  = $this->resolveRedirectUrl($currentUrl, $response->getHeaderLine('Location'));
+
+			// A redirect we cannot make sense of. Hand it back and let the caller report the odd status.
+			if ($targetUrl === null)
+			{
+				return $response;
+			}
+
+			$this->assertRedirectAllowed($currentUrl, $targetUrl);
+
+			$request = $this->getRedirectedRequest($request, $status, $targetUrl);
+		}
+	}
+
+	/**
+	 * Builds the follow-up request for a redirect.
+	 *
+	 * The method is preserved, which is the RFC-compliant behaviour and matches the `strict` redirect mode the Guzzle
+	 * client has always been configured with. Only a 303 turns into a GET, as it is defined to.
+	 *
+	 * @param   RequestInterface  $request    The request which was redirected
+	 * @param   int               $status     The redirect status we received
+	 * @param   string            $targetUrl  The absolute URL to go to
+	 *
+	 * @return  RequestInterface
+	 * @since   1.1.0
+	 */
+	private function getRedirectedRequest(RequestInterface $request, int $status, string $targetUrl): RequestInterface
+	{
+		$method   = $request->getMethod();
+		$toGet    = $status === 303 && !in_array($method, ['GET', 'HEAD', 'OPTIONS'], true);
+		$redirect = $this->requestFactory->createRequest($toGet ? 'GET' : $method, $targetUrl);
+
+		foreach ($request->getHeaders() as $name => $values)
+		{
+			/**
+			 * Host is derived from the URI, and the request factory has already set it for the new one. Copying the
+			 * old value over would send the previous host's name to the new one.
+			 */
+			if (strtolower($name) === 'host')
+			{
+				continue;
+			}
+
+			// A GET has no body, so the headers describing one would be a lie.
+			if ($toGet && in_array(strtolower($name), ['content-type', 'content-length', 'transfer-encoding'], true))
+			{
+				continue;
+			}
+
+			$redirect = $redirect->withHeader($name, $values);
+		}
+
+		if (!$toGet)
+		{
+			$body = $request->getBody();
+
+			if ($body->isSeekable())
+			{
+				$body->rewind();
+			}
+
+			$redirect = $redirect->withBody($body);
+		}
+
+		return $redirect;
 	}
 
 	/**

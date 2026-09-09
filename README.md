@@ -77,6 +77,36 @@ Note that a v3 API token which authenticates but lacks the privilege for the met
 `Exception\NotAuthorised`, which is distinct from the `Exception\InvalidSecretWord` you get when the credential itself
 is rejected.
 
+### Redirects
+
+Redirects are followed, but only within the domain you gave us. All three bundled HTTP clients apply the same rule.
+
+Following them is not optional: a Joomla! site will redirect an API URL for entirely mundane reasons — adding the
+language prefix its SEF configuration calls for, moving between www and non-www, upgrading HTTP to HTTPS.
+
+Following them blindly is not acceptable either. Every request carries a credential, in a header on v3 and in the query
+string on v2, and HTTP clients forward those along a redirect chain. A redirect to somebody else's host would hand them
+your Secret Word or your API token — which is what an open redirect on your site, or a hostile one, would exploit. So
+each hop is checked, and a redirect which leaves your domain raises `Exception\UnsafeRedirect` *before* the request is
+made.
+
+Given a host of `www.example.com`, these are followed:
+
+* `www.example.com/en/index.php` — the same host
+* `example.com` — dropping the `www.`
+* `foobar.example.com` — a sibling subdomain
+* `https://www.example.com` from `http://www.example.com` — an upgrade to TLS
+
+and these are refused: `evil.net`, `123.1.2.3`, `notexample.com`, `www.example.com.evil.net`, and a *downgrade* from
+HTTPS to plaintext HTTP. The comparison is made on label boundaries and is anchored on your host with any leading
+`www.` removed, so with a host of `www.example.co.uk` a redirect to `evil.co.uk` is refused even though the two share
+the `co.uk` suffix.
+
+One case fails closed: a redirect *sideways* from a host which is neither your anchor nor beneath it —
+`api.example.com` to `shop.example.com`, say. Recognising those as related needs a public suffix list, and this library
+is deliberately free of that dependency, so it refuses them. Redirects *up* to a parent (`api.example.com` to
+`example.com`) are followed.
+
 ### Taking a backup (and tracking its progress)
 
 ```php

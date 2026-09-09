@@ -15,6 +15,7 @@ use Akeeba\BackupJsonApi\Exception\InvalidSecretWord;
 use Akeeba\BackupJsonApi\Exception\NotAuthorised;
 use Akeeba\BackupJsonApi\Exception\NotImplemented;
 use Akeeba\BackupJsonApi\Exception\UnknownMethod;
+use Akeeba\BackupJsonApi\Exception\UnsafeRedirect;
 use Akeeba\BackupJsonApi\Options;
 use Akeeba\BackupJsonApi\Uri\Uri;
 use Exception;
@@ -305,6 +306,241 @@ abstract class AbstractHttpClient implements HttpClientInterface
 		}
 
 		return $params;
+	}
+
+	/**
+	 * How many redirects we are willing to follow before giving up.
+	 *
+	 * @return  int
+	 * @since   1.1.0
+	 */
+	final protected function getMaxRedirects(): int
+	{
+		return 20;
+	}
+
+	/**
+	 * Is this HTTP status a redirect we should follow?
+	 *
+	 * @param   int  $status  The HTTP status of the response
+	 *
+	 * @return  bool
+	 * @since   1.1.0
+	 */
+	final protected function isRedirectStatus(int $status): bool
+	{
+		return in_array($status, [301, 302, 303, 307, 308], true);
+	}
+
+	/**
+	 * May we follow a redirect to this URL?
+	 *
+	 * Redirects have to be followed. A Joomla! site will redirect an API URL for entirely mundane reasons — adding the
+	 * language prefix its SEF configuration calls for, moving between www and non-www, upgrading HTTP to HTTPS — and
+	 * refusing to follow those would make the library unusable on a large share of real sites.
+	 *
+	 * They cannot be followed blindly, though. Each request carries a credential, in a header on the v3 API and in the
+	 * query string on v2, and the HTTP clients forward those along the chain. A redirect to a host outside the domain
+	 * the caller gave us would therefore disclose that credential to a third party — which is what an open redirect on
+	 * the site, or a hostile site, would exploit.
+	 *
+	 * The rule is that a redirect may not leave the domain the caller gave us. Concretely, the target must be either:
+	 *
+	 * 1. the caller's host with any leading `www.` removed — the “anchor” — or anything beneath it. This is what allows
+	 *    www.example.com to redirect to example.com, to foobar.example.com, or to itself; or
+	 * 2. an ancestor of the caller's host, which is what allows api.example.com to redirect to example.com.
+	 *
+	 * Both comparisons are made on label boundaries, so example.com cannot be matched by notexample.com, and neither
+	 * clause can reach a *sibling* of an ancestor. That last point is what makes this safe without consulting a public
+	 * suffix list: with a caller host of www.example.co.uk the anchor is example.co.uk, so evil.co.uk satisfies neither
+	 * clause, even though it shares the co.uk suffix. A naive “compare the last two labels” rule would have allowed it.
+	 *
+	 * The one thing this does not allow is a redirect sideways from a host which is neither the anchor nor beneath it —
+	 * api.example.com to shop.example.com, say. Identifying those as related needs a public suffix list to do safely,
+	 * and this library is deliberately free of that dependency, so it fails closed.
+	 *
+	 * @param   string  $targetUrl  The URL the server wants us to go to
+	 *
+	 * @return  bool
+	 * @since   1.1.0
+	 */
+	final protected function isRedirectAllowed(string $targetUrl): bool
+	{
+		/**
+		 * A URL we cannot even parse is a URL we will not follow. Uri throws on a malformed one, and a server which is
+		 * redirecting us somewhere we should not go is exactly the kind of server which would send us a malformed
+		 * Location header — so this has to be a refusal, not an exception of an unrelated type escaping to the caller.
+		 */
+		try
+		{
+			$target = new Uri($targetUrl);
+			$origin = new Uri($this->options->host);
+		}
+		catch (Throwable)
+		{
+			return false;
+		}
+
+		$targetScheme = strtolower((string) ($target->scheme ?? ''));
+		$originScheme = strtolower((string) ($origin->scheme ?? ''));
+
+		// We only speak HTTP and HTTPS. Anything else is not a redirect we could follow even if we wanted to.
+		if (!in_array($targetScheme, ['http', 'https'], true))
+		{
+			return false;
+		}
+
+		/**
+		 * Never let an HTTPS connection be downgraded to plaintext HTTP. The credential travels with every request, so
+		 * a downgrade puts it on the wire in the clear — and a downgrade is exactly what an attacker in a position to
+		 * rewrite the response would ask for.
+		 */
+		if ($originScheme === 'https' && $targetScheme !== 'https')
+		{
+			return false;
+		}
+
+		$targetHost = $this->normaliseHost((string) ($target->host ?? ''));
+		$originHost = $this->normaliseHost((string) ($origin->host ?? ''));
+
+		if ($targetHost === '' || $originHost === '')
+		{
+			return false;
+		}
+
+		/**
+		 * An IP address has no domain hierarchy to reason about: 1.2.3.4 is not "beneath" 2.3.4 in any sense. Require
+		 * an exact match whenever either end is a literal address, which also stops a hostname from being matched
+		 * against an address or the other way round.
+		 */
+		if ($this->isIpAddress($targetHost) || $this->isIpAddress($originHost))
+		{
+			return $targetHost === $originHost;
+		}
+
+		$anchor = str_starts_with($originHost, 'www.') ? substr($originHost, 4) : $originHost;
+
+		// The anchor itself, or anything beneath it
+		if ($targetHost === $anchor || str_ends_with($targetHost, '.' . $anchor))
+		{
+			return true;
+		}
+
+		// An ancestor of the caller's host
+		return str_ends_with($originHost, '.' . $targetHost);
+	}
+
+	/**
+	 * Throws unless we may follow a redirect to this URL.
+	 *
+	 * @param   string  $fromUrl    The URL which issued the redirect
+	 * @param   string  $targetUrl  The URL the server wants us to go to
+	 *
+	 * @return  void
+	 * @throws  UnsafeRedirect
+	 * @since   1.1.0
+	 */
+	final protected function assertRedirectAllowed(string $fromUrl, string $targetUrl): void
+	{
+		if ($this->isRedirectAllowed($targetUrl))
+		{
+			$this->logger->debug(sprintf('Following a redirect from %s to %s', $fromUrl, $targetUrl));
+
+			return;
+		}
+
+		$this->logger->error(sprintf('Refusing to follow a redirect from %s to %s', $fromUrl, $targetUrl));
+
+		throw new UnsafeRedirect($fromUrl, $targetUrl);
+	}
+
+	/**
+	 * Turns the Location header of a redirect response into an absolute URL.
+	 *
+	 * The header is allowed to be a relative reference, and real servers use every shape of one, so we cannot simply
+	 * hand its value to the next request.
+	 *
+	 * @param   string  $currentUrl  The URL we requested, which the Location is relative to
+	 * @param   string  $location    The raw value of the Location response header
+	 *
+	 * @return  string|null  The absolute URL, or NULL if the header was unusable
+	 * @since   1.1.0
+	 */
+	final protected function resolveRedirectUrl(string $currentUrl, string $location): ?string
+	{
+		$location = trim($location);
+
+		if ($location === '')
+		{
+			return null;
+		}
+
+		// Already absolute
+		if (preg_match('#^[a-z][a-z0-9+.\-]*:#i', $location))
+		{
+			return $location;
+		}
+
+		// As in isRedirectAllowed(): a URL we cannot parse is not one we can resolve against.
+		try
+		{
+			$base = new Uri($currentUrl);
+		}
+		catch (Throwable)
+		{
+			return null;
+		}
+
+		$scheme = (string) ($base->scheme ?? '');
+
+		// Scheme-relative, e.g. //www.example.com/foo
+		if (str_starts_with($location, '//'))
+		{
+			return $scheme . ':' . $location;
+		}
+
+		$authority = $base->toString(['scheme', 'host', 'port']);
+
+		// Root-relative, e.g. /en/index.php
+		if (str_starts_with($location, '/'))
+		{
+			return $authority . $location;
+		}
+
+		// Relative to the directory of the current path, e.g. index.php
+		$path      = (string) ($base->path ?? '');
+		$lastSlash = strrpos($path, '/');
+		$directory = $lastSlash === false ? '' : substr($path, 0, $lastSlash);
+
+		return $authority . '/' . ltrim($directory . '/' . $location, '/');
+	}
+
+	/**
+	 * Normalises a host name for comparison.
+	 *
+	 * @param   string  $host  The host, as parsed out of a URL
+	 *
+	 * @return  string
+	 * @since   1.1.0
+	 */
+	private function normaliseHost(string $host): string
+	{
+		// A trailing dot makes a name fully qualified. It is the same name; drop it so it compares equal.
+		return strtolower(trim(trim($host), '.'));
+	}
+
+	/**
+	 * Is this host a literal IP address rather than a name?
+	 *
+	 * @param   string  $host  The host, as parsed out of a URL
+	 *
+	 * @return  bool
+	 * @since   1.1.0
+	 */
+	private function isIpAddress(string $host): bool
+	{
+		// An IPv6 literal appears in a URL wrapped in square brackets, which are not part of the address.
+		return filter_var(trim($host, '[]'), FILTER_VALIDATE_IP) !== false;
 	}
 
 	/**
