@@ -11,6 +11,7 @@ use Akeeba\BackupJsonApi\Exception\CommunicationError;
 use Akeeba\BackupJsonApi\Options;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
+use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 
 /**
@@ -58,13 +59,15 @@ class HttpClientPsr extends AbstractHttpClient
 			[$to, $from] = [$from, $to];
 		}
 
-		$request = $this->requestFactory
-			->createRequest('GET', $url)
-			->withHeader('User-Agent', $this->options->ua);
+		/**
+		 * The authentication headers are not optional here: the v3 API is authenticated by header alone, so a
+		 * downloadDirect URL carries no credential of its own.
+		 */
+		$request = $this->applyHeaders($this->requestFactory->createRequest('GET', $url));
 
 		if (!empty($from) || !empty($to))
 		{
-			$request->withHeader('Range', sprintf('bytes=%d=%d', $from, $to));
+			$request = $request->withHeader('Range', sprintf('bytes=%d=%d', $from, $to));
 		}
 
 		$response = $this->http->sendRequest($request);
@@ -104,7 +107,8 @@ class HttpClientPsr extends AbstractHttpClient
 			$payload = http_build_query($this->getQueryStringParameters($apiMethod, $data));
 			$request = $this->requestFactory
 				->createRequest('POST', $url)
-				->withBody($this->streamFactory->createStream($payload));
+				->withBody($this->streamFactory->createStream($payload))
+				->withHeader('Content-Type', 'application/x-www-form-urlencoded');
 		}
 		else
 		{
@@ -112,7 +116,7 @@ class HttpClientPsr extends AbstractHttpClient
 				->createRequest('GET', $url);
 		}
 
-		$request->withHeader('User-Agent', $this->options->ua);
+		$request = $this->applyHeaders($request);
 
 		$response = $this->http->sendRequest($request);
 
@@ -125,5 +129,27 @@ class HttpClientPsr extends AbstractHttpClient
 		}
 
 		return (string) $response->getBody();
+	}
+
+	/**
+	 * Applies the API request headers to a PSR-7 request.
+	 *
+	 * PSR-7 requests are immutable: withHeader() returns a *new* request rather than modifying the one it was called
+	 * on. Discarding that return value — which is easily done, since the call looks like a setter — silently drops the
+	 * header, and with it the v3 API's only credential.
+	 *
+	 * @param   RequestInterface  $request  The request to apply the headers to
+	 *
+	 * @return  RequestInterface  A new request, carrying the headers
+	 * @since   1.1.0
+	 */
+	private function applyHeaders(RequestInterface $request): RequestInterface
+	{
+		foreach ($this->getRequestHeaders() as $name => $value)
+		{
+			$request = $request->withHeader($name, $value);
+		}
+
+		return $request;
 	}
 }

@@ -10,6 +10,7 @@ namespace Akeeba\BackupJsonApi\HttpAbstraction;
 use Joomla\Http\Exception\InvalidResponseCodeException;
 use Joomla\Http\Http;
 use Joomla\Http\HttpFactory;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * An HTTP client using Joomla Framework
@@ -51,7 +52,11 @@ class HttpClientJoomla extends AbstractHttpClient
 			['curl']
 		);
 
-		$headers = [];
+		/**
+		 * The authentication headers are not optional here: the v3 API is authenticated by header alone, so a
+		 * downloadDirect URL carries no credential of its own.
+		 */
+		$headers = $this->getRequestHeaders();
 
 		if (!empty($from) || !empty($to))
 		{
@@ -87,14 +92,39 @@ class HttpClientJoomla extends AbstractHttpClient
 		$this->logger->debug('URL: ' . $url);
 		$this->logger->debug('>> Data:' . PHP_EOL . print_r($data, true));
 
+		$headers = $this->getRequestHeaders();
+
 		if ($verb == 'POST')
 		{
 			$payload = http_build_query($this->getQueryStringParameters($apiMethod, $data));
 
-			return $this->http->post($url, $payload)->body;
+			return $this->getResponseBody($this->http->post($url, $payload, $headers));
 		}
 
-		return $this->http->get($url)->body;
+		return $this->getResponseBody($this->http->get($url, $headers));
+	}
+
+	/**
+	 * Extracts the body from a Joomla Framework HTTP response.
+	 *
+	 * The response object changed shape between major versions of joomla/http. Up to and including 2.x it was a plain
+	 * data object with a public $body string. From 3.x on it extends a PSR-7 response, where the body is a stream
+	 * reached through getBody() and the old property does not exist at all — reading it yields a warning and NULL,
+	 * which surfaces as a TypeError from this method's return type rather than as anything diagnostic.
+	 *
+	 * @param   object  $response  The response returned by the Joomla Framework HTTP client
+	 *
+	 * @return  string
+	 * @since   1.1.0
+	 */
+	private function getResponseBody(object $response): string
+	{
+		if ($response instanceof ResponseInterface)
+		{
+			return (string) $response->getBody();
+		}
+
+		return (string) ($response->body ?? '');
 	}
 
 	protected function applyOptions()

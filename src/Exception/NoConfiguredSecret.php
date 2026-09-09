@@ -11,7 +11,7 @@ use Exception;
 use RuntimeException;
 
 /**
- * Missing configuration options: secret key
+ * Missing configuration options: neither a Secret Word nor a Joomla! API token was given
  *
  * @since  1.0.0
  */
@@ -19,7 +19,7 @@ class NoConfiguredSecret extends RuntimeException
 {
 	public function __construct(int $code = 37, ?Exception $previous = null)
 	{
-		$message = 'You did not specify a secret key.';
+		$message = 'You did not specify a credential to authenticate with. Provide either a Joomla! API token (recommended; JSON API v3 only) or the Akeeba Backup JSON API Secret Word.';
 
 		parent::__construct($message, $code, $previous);
 	}

@@ -12,6 +12,7 @@ use Akeeba\BackupJsonApi\Exception\CommunicationError;
 use Akeeba\BackupJsonApi\Exception\InvalidEncapsulatedJSON;
 use Akeeba\BackupJsonApi\Exception\InvalidJSONBody;
 use Akeeba\BackupJsonApi\Exception\InvalidSecretWord;
+use Akeeba\BackupJsonApi\Exception\NotAuthorised;
 use Akeeba\BackupJsonApi\Exception\NotImplemented;
 use Akeeba\BackupJsonApi\Exception\UnknownMethod;
 use Akeeba\BackupJsonApi\Options;
@@ -53,18 +54,10 @@ abstract class AbstractHttpClient implements HttpClientInterface
 			$this->logger->debug('<< Response: ' . PHP_EOL . $encapsulatedResponse);
 		}
 
-		// Expose the encapsulated data
-		switch ($this->options->view ?? 'json')
-		{
-			case 'json':
-				$apiResult = $this->exposeDataAPIv1($encapsulatedResponse ?? '');
-				break;
-
-			default:
-			case 'api':
-				$apiResult = $this->exposeDataAPIv2($encapsulatedResponse ?? '');
-				break;
-		}
+		// Expose the encapsulated data. Only the v1 API encapsulates its response; v2 and v3 share a response shape.
+		$apiResult = $this->getApiVersion() === 1
+			? $this->exposeDataAPIv1($encapsulatedResponse ?? '')
+			: $this->exposeDataModernApi($encapsulatedResponse ?? '');
 
 		if ($apiResult->body->status !== 200)
 		{
@@ -91,16 +84,33 @@ abstract class AbstractHttpClient implements HttpClientInterface
 			throw new InvalidSecretWord();
 		}
 
+		/**
+		 * We are authenticated, but not authorised for this method.
+		 *
+		 * Only the v3 API, authenticating with a Joomla! API token, can answer this. It is deliberately distinct from
+		 * the 503 above: 503 means we never established who we are, 403 means we did and we may not do this.
+		 */
+		if ($apiResult->body->status === 403)
+		{
+			throw new NotAuthorised($apiMethod);
+		}
+
 		return $apiResult;
 	}
 
 	/** @inheritDoc */
 	final public function makeURL(string $apiMethod, array $data = [], ?string $verb = null): string
 	{
+		$verb ??= $this->options->verb;
+
+		if ($this->getApiVersion() === 3)
+		{
+			return $this->makeURLv3($apiMethod, $data, $verb);
+		}
+
 		// Extract options. DO NOT REMOVE. empty() does NOT work on magic properties!
 		$url         = rtrim($this->options->host, '/');
 		$endpoint    = $this->options->endpoint;
-		$verb        ??= $this->options->verb;
 		$isWordPress = $this->options->isWordPress;
 
 		if (!empty($endpoint))
@@ -111,7 +121,7 @@ abstract class AbstractHttpClient implements HttpClientInterface
 		// For v2 URLs we need to add the authentication as a GET parameter
 		$uri = new Uri($url);
 
-		if ($this->options->view == 'api')
+		if ($this->getApiVersion() === 2)
 		{
 			$uri->setVar('_akeebaAuth', $this->options->secret);
 		}
@@ -138,6 +148,46 @@ abstract class AbstractHttpClient implements HttpClientInterface
 			$uri->delVar('option');
 			$uri->delVar('view');
 			$uri->delVar('format');
+		}
+
+		return $uri->toString();
+	}
+
+	/**
+	 * Create a JSON API v3 URL.
+	 *
+	 * The v3 API is a route in Joomla's API application, not a view in the site's frontend. The API method is a path
+	 * segment of the route, which is why neither the method nor the option, view, format, and tmpl parameters the
+	 * older versions need appear anywhere in the URL.
+	 *
+	 * Note what is conspicuously absent: the credential. The v3 API is authenticated with request headers — see
+	 * getRequestHeaders() — so a Secret Word or an API token never ends up in a URL, and therefore never ends up in
+	 * the server's access log, a proxy's cache, or a browser's history.
+	 *
+	 * @param   string  $apiMethod  The API method to execute on the remote server.
+	 * @param   array   $data       Any data to send to the remote server.
+	 * @param   string  $verb       The HTTP verb the request will be made with.
+	 *
+	 * @return  string
+	 * @since   1.1.0
+	 */
+	private function makeURLv3(string $apiMethod, array $data, string $verb): string
+	{
+		// DO NOT REMOVE the local variables. empty() does NOT work on magic properties!
+		$host        = rtrim($this->options->host, '/');
+		$apiEndpoint = trim($this->options->apiEndpoint ?: Options::DEFAULT_API_ENDPOINT, '/');
+
+		$uri = new Uri($host . '/' . $apiEndpoint . '/v3/akeebabackup/' . rawurlencode($apiMethod));
+
+		// POST requests carry their payload in the request body; there is nothing more to add to the URL.
+		if ($verb == 'POST')
+		{
+			return $uri->toString();
+		}
+
+		foreach ($this->getQueryStringParameters($apiMethod, $data) as $k => $v)
+		{
+			$uri->setVar($k, $v);
 		}
 
 		return $uri->toString();
@@ -203,10 +253,21 @@ abstract class AbstractHttpClient implements HttpClientInterface
 	 */
 	final protected function getQueryStringParameters(string $apiMethod, array $data = []): array
 	{
-		switch ($this->options->view ?? 'json')
+		/**
+		 * The v3 API takes the payload and nothing else: the API method is a path segment of its route, and none of
+		 * the Joomla! frontend parameters below mean anything to Joomla's API application. In fact the webservices
+		 * plugin actively strips option, view, format, and tmpl from a v2 request, because their presence confuses
+		 * the API application's router — so do not be tempted to send them "just in case".
+		 */
+		if ($this->getApiVersion() === 3)
+		{
+			return $data;
+		}
+
+		switch ($this->getApiVersion())
 		{
 			// API v1
-			case 'json':
+			case 1:
 			default:
 				$params = [
 					'view' => 'json',
@@ -215,7 +276,7 @@ abstract class AbstractHttpClient implements HttpClientInterface
 				break;
 
 			// API v2
-			case 'api':
+			case 2:
 				$params = array_merge($data, ['view' => 'Api', 'method' => $apiMethod]);
 				break;
 		}
@@ -244,6 +305,75 @@ abstract class AbstractHttpClient implements HttpClientInterface
 		}
 
 		return $params;
+	}
+
+	/**
+	 * Returns the Akeeba Backup JSON API version we are talking.
+	 *
+	 * The options may not say — a zero `apiVersion` means nobody specified one, and Autodetect has not run either.
+	 * In that case we assume the newest version the configured endpoint could possibly speak. The v3 API is a route
+	 * in Joomla's API application, so it only exists on Joomla! sites; Akeeba Solo and Akeeba Backup for WordPress,
+	 * both of which are identified by their frontend endpoint, can only be talked to over the v2 API.
+	 *
+	 * @return  int  1, 2, or 3
+	 * @since   1.1.0
+	 */
+	final protected function getApiVersion(): int
+	{
+		$apiVersion = (int) ($this->options->apiVersion ?: 0);
+
+		if (in_array($apiVersion, Options::API_VERSIONS, true))
+		{
+			return $apiVersion;
+		}
+
+		return ($this->options->isWordPress || $this->options->endpoint === 'remote.php') ? 2 : 3;
+	}
+
+	/**
+	 * Returns the HTTP headers which must accompany an API request.
+	 *
+	 * This is where the v3 API is authenticated. There are two credentials, and the server treats them as mutually
+	 * exclusive: presenting a Secret Word makes it ignore any API token in the same request, and a *wrong* Secret
+	 * Word is a hard failure rather than a fall-through to token authentication. We must therefore send exactly one
+	 * of them, and we prefer the token — it identifies a Joomla! user whose privileges the server enforces per
+	 * method, whereas the Secret Word is a blanket grant over the whole component and is itself deprecated.
+	 *
+	 * @return  array  Header name => header value
+	 * @since   1.1.0
+	 */
+	final protected function getRequestHeaders(): array
+	{
+		$headers = [
+			'User-Agent' => $this->options->ua,
+		];
+
+		if ($this->getApiVersion() !== 3)
+		{
+			return $headers;
+		}
+
+		/**
+		 * Joomla's API application cannot accept a missing Accept header — it answers HTTP 406. Akeeba Backup's
+		 * webservices plugin papers over that for its own routes, but only for its own routes: a request which fails
+		 * to match one gets the raw 406. Send the header and the failure mode stays legible.
+		 */
+		$headers['Accept'] = 'application/json';
+
+		// DO NOT REMOVE the local variables. empty() does NOT work on magic properties!
+		$token  = trim((string) ($this->options->token ?? ''));
+		$secret = trim((string) ($this->options->secret ?? ''));
+
+		if ($token !== '')
+		{
+			$headers['X-Joomla-Token'] = $token;
+		}
+		elseif ($secret !== '')
+		{
+			$headers['X-Akeeba-Auth'] = $secret;
+		}
+
+		return $headers;
 	}
 
 	/**
@@ -470,19 +600,20 @@ abstract class AbstractHttpClient implements HttpClientInterface
 	}
 
 	/**
-	 * Extracts the data encapsulated in an API v2 response.
+	 * Extracts the data returned by the v2 and v3 APIs.
 	 *
-	 * Technically, there is no encapsulation in v2, but we transform the data in a way that gives it a similar shape to
-	 * v1 data, simplifying our code.
+	 * Technically, there is no encapsulation in either, but we transform the data in a way that gives it a similar
+	 * shape to v1 data, simplifying our code. The two versions share a response shape exactly — a status member and a
+	 * data member — which is the one thing about the v3 API a client does not have to change.
 	 *
 	 * @param   string  $encapsulatedResponse  The JSON data to parse.
 	 *
 	 * @return  object
 	 * @since   1.0.0
 	 */
-	private function exposeDataAPIv2(string $encapsulatedResponse): object
+	private function exposeDataModernApi(string $encapsulatedResponse): object
 	{
-		// JSON API v2: Get the JSON data and construct a result similar to what was returned by v1
+		// JSON API v2 and v3: Get the JSON data and construct a result similar to what was returned by v1
 		$result = json_decode($encapsulatedResponse, false);
 
 		if (is_null($result) || !property_exists($result, 'status') || !property_exists($result, 'data'))

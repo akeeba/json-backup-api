@@ -48,6 +48,10 @@ class HttpClientGuzzle extends AbstractHttpClient
 			$headers['Range'] = sprintf('bytes=%d=%d', $from, $to);
 		}
 
+		/**
+		 * getRequestOptions() adds the authentication headers to these. They are not optional here: the v3 API is
+		 * authenticated by header alone, so a downloadDirect URL carries no credential of its own.
+		 */
 		$options = $this->getRequestOptions($headers);
 
 		if (!is_resource($fp))
@@ -99,9 +103,7 @@ class HttpClientGuzzle extends AbstractHttpClient
 				'referer' => true,
 			],
 			RequestOptions::CONNECT_TIMEOUT => $this->connectionTimeout,
-			RequestOptions::HEADERS         => array_merge([
-				'User-Agent' => $this->options->ua,
-			], $headers),
+			RequestOptions::HEADERS         => array_merge($this->getRequestHeaders(), $headers),
 			RequestOptions::READ_TIMEOUT    => $this->readTimeout,
 			RequestOptions::SYNCHRONOUS     => true,
 			RequestOptions::TIMEOUT         => $this->timeout,
