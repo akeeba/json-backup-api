@@ -163,4 +163,4 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ## Regulatory status (EU Cyber Resilience Act)
 
-Akeeba Backup JSON API Client Library is not monetized and is not placed on the market within the meaning of Regulation (EU) 2024/2847; Akeeba Ltd acts as its open-source software steward under Article 24 of that Regulation.
+Akeeba Kickstart is not monetised and is not placed on the market within the meaning of Regulation (EU) 2024/2847.
