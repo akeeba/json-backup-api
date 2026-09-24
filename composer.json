@@ -66,7 +66,8 @@
 			"/rector.php",
 			"/.phpunit.cache",
 			".phpunit.result.cache",
-			".gitignore"
+			".gitignore",
+			"/AGENTS.md"
 		]
 	}
 }
